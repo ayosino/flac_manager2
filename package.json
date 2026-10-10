@@ -1,0 +1,27 @@
+{
+  "name": "flac-manager",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "scan": "node metadata_scanner.js",
+    "init-db": "node init_db.js",
+    "setup": "npm install && node init_db.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "faiss-node": "^0.5.1",
+    "kuromoji": "^0.1.2",
+    "music-metadata": "^11.12.3",
+    "mysql2": "^3.20.0",
+    "wanakana": "^5.3.1"
+  }
+}

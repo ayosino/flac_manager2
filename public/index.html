@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theatre of Eternal Music</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --accent-color: #007bff;
+            --secondary-text: #666666;
+            --border-color: #eeeeee;
+            --hover-bg: #f8f9fa;
+            --header-bg: #ffffff;
+            --player-bg: #ffffff;
+            --active-bg: #e7f3ff;
+            --card-bg: #ffffff;
+            --pager-bg: #fafafa;
+        }
+
+        body[data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --secondary-text: #a0a0a0;
+            --border-color: #333333;
+            --hover-bg: #2a2a2a;
+            --header-bg: #1a1a1a;
+            --player-bg: #1a1a1a;
+            --active-bg: #004a99;
+            --card-bg: #222222;
+            --pager-bg: #222222;
+        }
+
+        body[data-theme="oled"] {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --secondary-text: #888888;
+            --border-color: #222222;
+            --hover-bg: #111111;
+            --header-bg: #000000;
+            --player-bg: #000000;
+            --active-bg: #003366;
+            --card-bg: #000000;
+            --pager-bg: #000000;
+        }
+
+        body[data-theme="sepia"] {
+            --bg-color: #f4ecd8;
+            --text-color: #5b4636;
+            --secondary-text: #8c786a;
+            --border-color: #dcd0b9;
+            --hover-bg: #ede0b5;
+            --header-bg: #f4ecd8;
+            --player-bg: #f4ecd8;
+            --active-bg: #e2d1a6;
+            --card-bg: #f4ecd8;
+            --pager-bg: #ede0b5;
+        }
+
+        body[data-mode="compact"] .list-item { padding: 5px 25px; }
+        body[data-mode="compact"] .track-item { padding: 4px 25px; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color); color: var(--text-color);
+            margin: 0; padding: 0; padding-bottom: 80px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        header {
+            padding: 10px 25px; border-bottom: 1px solid var(--border-color);
+            background: var(--header-bg); position: sticky; top: 0; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center; height: 45px;
+        }
+        h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .list-group { border-top: 1px solid var(--border-color); }
+        .list-item {
+            padding: 10px 25px; border-bottom: 1px solid var(--border-color);
+            cursor: pointer; display: flex; align-items: center;
+            transition: background-color 0.1s; gap: 15px;
+        }
+        .list-item:hover { background-color: var(--hover-bg); }
+        .list-item .row-no { width: 80px; flex-shrink: 0; font-size: 0.75rem; color: var(--secondary-text); }
+        .list-item .id-col { width: 45px; flex-shrink: 0; font-size: 0.7rem; color: var(--secondary-text); opacity: 0.7; }
+        .list-item .artist-name { 
+            width: 180px; flex-shrink: 0; font-weight: 600; font-size: 0.85rem;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .list-item .album-title { 
+            flex-grow: 1; font-size: 0.9rem; color: var(--text-color);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .list-item .meta { width: 150px; text-align: right; font-size: 0.75rem; color: var(--secondary-text); }
+
+        .view-header { padding: 15px 25px; background: var(--pager-bg); border-bottom: 1px solid var(--border-color); }
+        .view-header h2 { margin: 0 0 5px 0; font-size: 1.2rem; }
+        .view-header p { margin: 0; color: var(--secondary-text); font-size: 0.9rem; }
+        .back-btn { padding: 10px 25px; cursor: pointer; color: var(--accent-color); font-weight: 600; font-size: 0.9rem; }
+        .back-btn:hover { text-decoration: underline; }
+
+        .track-list { list-style: none; padding: 0; margin: 0; }
+        .track-item { padding: 8px 25px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; cursor: pointer; }
+        .track-item:hover { background-color: var(--hover-bg); }
+        .track-item.active { background-color: var(--active-bg); color: var(--accent-color); font-weight: 600; }
+        body[data-theme="dark"] .track-item.active, body[data-theme="oled"] .track-item.active { color: #fff; }
+
+        .track-no { width: 40px; color: var(--secondary-text); font-size: 0.85rem; }
+        .track-title { flex-grow: 1; font-size: 0.9rem; }
+        .track-duration { color: var(--secondary-text); font-size: 0.8rem; width: 60px; text-align: right; }
+
+        .player-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%; background-color: var(--player-bg);
+            border-top: 1px solid var(--border-color); padding: 10px 25px;
+            display: flex; align-items: center; box-sizing: border-box; z-index: 2000; height: 75px;
+        }
+        .now-playing { width: 30%; overflow: hidden; }
+        .player-title { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .player-artist { font-size: 0.8rem; color: var(--secondary-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .controls { width: 40%; display: flex; flex-direction: column; align-items: center; }
+        .controls-btns { display: flex; align-items: center; gap: 15px; margin-bottom: 5px; }
+        .play-btn { 
+            background: var(--accent-color); color: white; border: none; 
+            width: 36px; height: 36px; border-radius: 50%; cursor: pointer; 
+            display: flex; justify-content: center; align-items: center; font-size: 1rem;
+        }
+        .progress-container { width: 100%; display: flex; align-items: center; gap: 12px; font-size: 0.7rem; color: var(--secondary-text); }
+        .progress-bar { flex-grow: 1; height: 4px; background: var(--hover-bg); border-radius: 2px; position: relative; cursor: pointer; }
+        .progress-fill { height: 100%; background: var(--accent-color); border-radius: 2px; width: 0%; }
+        .volume-container { width: 30%; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+        input[type=range] { cursor: pointer; accent-color: var(--accent-color); }
+
+        .hidden { display: none; }
+        .search-container { position: relative; display: flex; align-items: center; }
+        #search-input, select { 
+            padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px;
+            font-size: 0.85rem; background: var(--card-bg); color: var(--text-color);
+        }
+        #search-input { width: 180px; padding-right: 30px; }
+        #clear-search { 
+            position: absolute; right: 8px; cursor: pointer; color: var(--secondary-text);
+            font-size: 0.8rem; display: none; padding: 4px;
+        }
+        #clear-search:hover { color: var(--accent-color); }
+
+        #queue-view {
+            position: fixed; top: 0; right: -100%; width: 350px; height: 100%;
+            background: var(--bg-color); border-left: 1px solid var(--border-color);
+            z-index: 3000; transition: right 0.3s; padding-bottom: 80px;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column;
+        }
+        #queue-view.open { right: 0; }
+        .queue-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .queue-list { overflow-y: auto; flex-grow: 1; }
+        .queue-item { padding: 10px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .queue-item:hover { background-color: var(--hover-bg); }
+        .queue-item.active { background-color: var(--active-bg); color: var(--accent-color); font-weight: 600; }
+        body[data-theme="dark"] .queue-item.active, body[data-theme="oled"] .queue-item.active { color: #fff; }
+
+        .queue-item .track-info { flex-grow: 1; min-width: 0; }
+        .queue-item .track-info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.8rem; }
+        .remove-btn { color: #dc3545; cursor: pointer; font-size: 1.1rem; padding: 5px; }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        .btn { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--card-bg); color: var(--text-color); cursor: pointer; font-size: 0.8rem; }
+        .btn:hover { background: var(--hover-bg); }
+        .btn.primary { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+
+        .icon-btn { 
+            background: none; border: none; cursor: pointer; font-size: 1.1rem; 
+            color: var(--secondary-text); padding: 5px; display: flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; border-radius: 50%; transition: all 0.2s;
+        }
+        .icon-btn:hover { color: var(--accent-color); background: var(--hover-bg); }
+        .icon-btn.active { color: #fff !important; background: var(--accent-color); }
+        .track-item .icon-btn { visibility: hidden; width: 24px; height: 24px; font-size: 0.9rem; }
+        .track-item:hover .icon-btn { visibility: visible; }
+
+        .nav-tabs {
+            display: flex; gap: 20px; padding: 5px 25px; border-bottom: 1px solid var(--border-color);
+            background: var(--header-bg); position: sticky; top: 45px; z-index: 100;
+            overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch;
+        }
+        .nav-tabs::-webkit-scrollbar { display: none; }
+        .tab { 
+            padding: 8px 12px; cursor: pointer; font-size: 0.85rem; font-weight: 500; 
+            color: var(--secondary-text); border-bottom: 2px solid transparent; 
+            flex-shrink: 0;
+        }
+        .tab.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+        .tab:hover { color: var(--accent-color); }
+
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        .pager { display: flex; justify-content: center; align-items: center; gap: 15px; padding: 10px; background: var(--pager-bg); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+        .pager.bottom { border-bottom: none; border-top: 1px solid var(--border-color); }
+        .pager-info { font-size: 0.8rem; color: var(--secondary-text); }
+        .folder-icon::before { content: '📁'; margin-right: 10px; }
+
+        #context-menu {
+            position: fixed; display: none; background: var(--card-bg); border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); border-radius: 4px; z-index: 5000; min-width: 180px; padding: 5px 0;
+            color: var(--text-color);
+        }
+        .menu-item { padding: 8px 20px; cursor: pointer; font-size: 0.85rem; transition: background 0.1s; }
+        .menu-item:hover { background: var(--hover-bg); color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div id="context-menu"></div>
+    <header>
+        <h1>Theatre of Eternal Music</h1>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="sort-select" onchange="onSortChange(this.value)" style="padding: 5px; border-radius: 4px; border-1px solid var(--border-color); font-size: 0.8rem;">
+                <option value="alpha">A-Z</option>
+                <option value="added">Added Date</option>
+                <option value="id_desc">ID (Newest)</option>
+                <option value="id_asc">ID (Oldest)</option>
+            </select>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search..." oninput="onSearchInput(this.value)">
+                <span id="clear-search" onclick="clearSearch()">✕</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="nav-tabs">
+        <div class="tab active" id="tab-albums" onclick="switchView('albums')">Albums</div>
+        <div class="tab" id="tab-artists" onclick="switchView('artists')">Artists</div>
+        <div class="tab" id="tab-folders" onclick="switchView('folders')">Folders</div>
+        <div class="tab" id="tab-playlists" onclick="switchView('playlists')">Playlists</div>
+        <div class="tab" id="tab-random" onclick="switchView('random')">Random</div>
+        <div class="tab" id="tab-autogen" onclick="switchView('autogen')">Autogen</div>
+        <div class="tab" id="tab-history" onclick="switchView('history')">History</div>
+        <div class="tab" id="tab-settings" onclick="switchView('settings')">Settings</div>
+    </div>
+
+    <div class="container">
+        <div id="albums-section" class="view-section active">
+            <div id="albums-pager-top" class="pager"></div>
+            <div class="list-group" id="album-list"></div>
+            <div id="albums-pager-bottom" class="pager bottom"></div>
+        </div>
+        <div id="artists-section" class="view-section">
+            <div id="artists-pager-top" class="pager"></div>
+            <div class="list-group" id="artist-list"></div>
+            <div id="artists-pager-bottom" class="pager bottom"></div>
+        </div>
+        <div id="folders-section" class="view-section">
+            <div class="list-group" id="folder-list"></div>
+            <div id="folders-pager-bottom" class="pager bottom"></div>
+        </div>
+        <div id="playlists-section" class="view-section">
+            <div class="pager"><button class="btn primary" onclick="createNewPlaylist()">+ New Playlist</button></div>
+            <div class="list-group" id="playlist-list"></div>
+        </div>
+        <div id="random-section" class="view-section">
+            <div class="pager"><button class="btn primary" onclick="loadCurrentView()">Refresh Random</button></div>
+            <div class="list-group" id="random-list"></div>
+        </div>
+        <div id="autogen-section" class="view-section">
+            <div class="pager">
+                <button class="btn primary" onclick="playAutogenNow()">Play Now</button>
+                <button class="btn" onclick="loadAutogenPlaylist()">Refresh Autogen</button>
+                <button class="btn" onclick="addAutogenToQueue()">Add to Queue</button>
+                <button class="btn" onclick="addAutogenPlaylistToPlaylist()">Save to Playlist</button>
+            </div>
+            <div id="autogen-list"></div>
+        </div>
+        <div id="history-section" class="view-section">
+            <div class="list-group" id="history-list"></div>
+        </div>
+        <div id="settings-section" class="view-section">
+            <div class="view-header"><h2>Settings</h2><p>Application preferences</p></div>
+            <div style="padding: 25px;">
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Theme</label>
+                    <select id="theme-select" onchange="setTheme(this.value)" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.9rem; width: 220px; background: var(--card-bg); color: var(--text-color);">
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                        <option value="oled">OLED</option>
+                        <option value="sepia">Sepia</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Display Mode</label>
+                    <select id="mode-select" onchange="setMode(this.value)" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.9rem; width: 220px; background: var(--card-bg); color: var(--text-color);">
+                        <option value="normal">Normal</option>
+                        <option value="compact">Compact</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Autoplay (FAISS)</label>
+                    <select id="autoplay-select" onchange="setAutoplay(this.value)" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.9rem; width: 220px; background: var(--card-bg); color: var(--text-color);">
+                        <option value="off">OFF</option>
+                        <option value="on">ON</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="track-view" class="hidden">
+            <div class="back-btn" id="track-back-btn">← Back</div>
+            <div id="track-content"></div>
+        </div>
+    </div>
+
+    <div id="queue-view">
+        <div class="queue-header"><h3>Play Queue</h3><button class="icon-btn" onclick="toggleQueue()">✕</button></div>
+        <div id="queue-list" class="queue-list"></div>
+        <div style="padding: 10px 20px; border-top: 1px solid var(--border-color);"><button class="btn" style="width: 100%;" onclick="clearQueue()">Clear Queue</button></div>
+    </div>
+
+    <div class="player-bar">
+        <div class="now-playing"><div id="player-title" class="player-title">Not Playing</div><div id="player-artist" class="player-artist"></div></div>
+        <div class="controls">
+            <div class="controls-btns">
+                <button class="icon-btn" id="shuffle-btn" onclick="toggleShuffle()" title="Shuffle">🔀</button>
+                <button class="icon-btn" onclick="playPrev()">⏮</button>
+                <button class="play-btn" id="play-pause-btn" onclick="togglePlay()">▶</button>
+                <button class="icon-btn" onclick="playNext()">⏭</button>
+                <button class="icon-btn" id="repeat-btn" onclick="toggleRepeat()" title="Repeat">🔁</button>
+            </div>
+            <div class="progress-container"><span id="current-time">0:00</span><div class="progress-bar" id="progress-bar" onclick="seek(event)"><div class="progress-fill" id="progress-fill"></div></div><span id="total-time">0:00</span></div>
+        </div>
+        <div class="volume-container"><button class="icon-btn" onclick="toggleQueue()" style="margin-right: 15px;">≡</button><input type="range" min="0" max="1" step="0.01" value="0.5" oninput="setVolume(this.value)"></div>
+    </div>
+
+    <audio id="audio-player"></audio>
+
+    <script>
+        const audio = document.getElementById('audio-player');
+        let currentTrackId = null, playQueue = [], currentQueueIndex = -1, currentView = 'albums', itemsPerPage = 50, searchDebounceTimer = null, isShuffle = false, repeatMode = 'none', playlistsData = [], isAutoplay = false, autogenPlaylist = [];
+        let isQueueLoaded = false;
+        const viewStates = { albums: { page: 1, search: '', sort: 'alpha' }, artists: { page: 1, search: '', sort: 'alpha' }, folders: { path: '' }, playlists: { search: '' }, random: { search: '' }, autogen: {}, history: {}, settings: {} };
+
+        function esc(str) { 
+            if (!str) return '';
+            return str.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function jsesc(str) {
+            if (!str) return '';
+            return str.toString().replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        function formatPath(p) { if (!p) return ''; const c = p.replace(/^\/+/, '').split('/'); let i = (c[0]==='mnt'&&c[1]==='y')?2:0; return c[i] || ''; }
+        function formatDate(s) { if (!s) return ''; const d = new Date(s); return isNaN(d)?'':`${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`; }
+
+        async function init() {
+            initTheme();
+            initMode();
+            initAutoplay();
+            initVolume();
+            await syncQueueWithServer();
+            await restorePlaybackState();
+            await loadPlaylistsData();
+            await loadCurrentView();
+
+            // ショートカットキー設定
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+                const k = e.key.toLowerCase();
+                if (k === 'q') {
+                    toggleQueue();
+                } else if (k === ' ') {
+                    e.preventDefault();
+                    togglePlay();
+                } else if (k === 'k') {
+                    changeVolume(0.05);
+                } else if (k === 'j') {
+                    changeVolume(-0.05);
+                } else if (k === 'l') {
+                    playNext();
+                } else if (k === 'h') {
+                    playPrev();
+                } else if (k === 'n') {
+                    playNext();
+                } else if (k === 'p') {
+                    playPrev();
+                }
+            });
+        }
+
+        async function restorePlaybackState() {
+            try {
+                const r = await fetch('/api/playback-state');
+                const state = await r.json();
+                if (state.current_queue_id && playQueue.length > 0) {
+                    const idx = playQueue.findIndex(t => t.queue_id === state.current_queue_id);
+                    if (idx !== -1) {
+                        currentQueueIndex = idx;
+                        const t = playQueue[idx];
+                        // 復元時は自動再生はさせないが、プレイヤーの状態だけセットする
+                        currentTrackId = t.id;
+                        audio.src = `/api/stream/${t.id}`;
+                        audio.currentTime = state.seek_position || 0;
+                        document.getElementById('player-title').innerText = t.title;
+                        document.getElementById('player-artist').innerText = t.artist_name || t.artist;
+                        renderQueue();
+                    }
+                }
+            } catch(e) { console.error('Failed to restore playback state:', e); }
+        }
+
+        async function savePlaybackState() {
+            if (!isQueueLoaded) return;
+            const hasQueue = currentQueueIndex !== -1 && playQueue[currentQueueIndex];
+            const currentQueueId = hasQueue ? playQueue[currentQueueIndex].queue_id : null;
+            const seekPos = hasQueue ? audio.currentTime : 0;
+            try {
+                await fetch('/api/playback-state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        current_queue_id: currentQueueId,
+                        seek_position: seekPos
+                    })
+                });
+            } catch(e) { console.error('Failed to save playback state:', e); }
+        }
+
+        // 定期的に再生状態を保存（5秒ごと）
+        setInterval(() => {
+            if (!audio.paused) {
+                savePlaybackState();
+            }
+        }, 5000);
+
+        function initVolume() {
+            const saved = localStorage.getItem('volume') || 0.5;
+            audio.volume = saved;
+            const slider = document.querySelector('.volume-container input');
+            if (slider) slider.value = saved;
+        }
+
+        function setVolume(v) { 
+            audio.volume = v; 
+            localStorage.setItem('volume', v);
+        }
+
+        function changeVolume(delta) {
+            let v = audio.volume + delta;
+            if (v > 1) v = 1;
+            if (v < 0) v = 0;
+            setVolume(v);
+            const slider = document.querySelector('.volume-container input');
+            if (slider) slider.value = v;
+        }
+
+        function setTheme(theme) {
+            document.body.dataset.theme = theme;
+            localStorage.setItem('theme', theme);
+            document.getElementById('theme-select').value = theme;
+        }
+
+        function initTheme() {
+            const saved = localStorage.getItem('theme');
+            if (saved) setTheme(saved);
+            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+        }
+
+        function setMode(mode) {
+            document.body.dataset.mode = mode;
+            localStorage.setItem('mode', mode);
+            const select = document.getElementById('mode-select');
+            if (select) select.value = mode;
+        }
+
+        function initMode() {
+            const saved = localStorage.getItem('mode') || 'normal';
+            setMode(saved);
+        }
+
+        function setAutoplay(val) {
+            isAutoplay = (val === 'on');
+            localStorage.setItem('autoplay', val);
+            const select = document.getElementById('autoplay-select');
+            if (select) select.value = val;
+        }
+
+        function initAutoplay() {
+            const saved = localStorage.getItem('autoplay') || 'off';
+            setAutoplay(saved);
+        }
+
+        async function syncQueueWithServer() { try { const r = await fetch('/api/queue'); playQueue = await r.json(); isQueueLoaded = true; renderQueue(); } catch(e){ console.error(e); } }
+        async function loadPlaylistsData() { try { const r = await fetch('/api/playlists'); playlistsData = await r.json(); } catch(e){ console.error(e); } }
+
+        async function loadCurrentView() {
+            if (currentView === 'settings') return;
+            const s = viewStates[currentView];
+            try {
+                if (currentView === 'folders') { await browseFolder(s.path || ''); return; }
+                if (currentView === 'playlists') { await loadPlaylists(); return; }
+                if (currentView === 'autogen') { if (autogenPlaylist.length === 0) await loadAutogenPlaylist(); else renderAutogenPlaylist(); return; }
+                if (currentView === 'history') { await loadHistory(); return; }
+                const lim = currentView === 'random' ? 20 : itemsPerPage;
+                const sp = s.search ? `&search=${encodeURIComponent(s.search)}` : '';
+                const pp = (s.page && currentView !== 'random') ? `&page=${s.page}` : '';
+                const otp = (s.sort && currentView !== 'random') ? `&sort=${s.sort}` : '';
+                const r = await fetch(`/api/${currentView}?limit=${lim}${pp}${sp}${otp}`);
+                const res = await r.json();
+                const d = res.data || [];
+                const si = s.page ? (s.page - 1) * itemsPerPage : 0;
+                if (currentView === 'albums') renderAlbums(d, 'album-list', res.totalCount, si);
+                if (currentView === 'artists') renderArtists(d, res.totalCount, si);
+                if (currentView === 'random') renderAlbums(d, 'random-list', d.length, 0);
+                if (currentView !== 'random') renderPager(res.totalCount, res.page, res.totalPages);
+            } catch(e){ console.error(e); }
+        }
+
+        function switchView(v) {
+            currentView = v;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${v}`).classList.add('active');
+            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(`${v}-section`).classList.add('active');
+            document.getElementById('track-view').classList.add('hidden');
+            
+            const searchInput = document.getElementById('search-input');
+            const sortSelect = document.getElementById('sort-select');
+            
+            if (v === 'settings') {
+                searchInput.parentElement.style.display = 'none';
+                sortSelect.style.display = 'none';
+            } else {
+                searchInput.parentElement.style.display = 'flex';
+                searchInput.value = viewStates[v].search || '';
+                sortSelect.style.display = (v === 'folders' || v === 'random' || v === 'playlists' || v === 'autogen' || v === 'history') ? 'none' : 'block';
+                sortSelect.value = viewStates[v].sort || 'alpha';
+            }
+            
+            loadCurrentView();
+        }
+
+        async function loadHistory() {
+            try {
+                const r = await fetch('/api/history?limit=100');
+                const d = await r.json();
+                renderHistory(d);
+            } catch(e) { console.error(e); }
+        }
+
+        function renderHistory(history) {
+            const l = document.getElementById('history-list'); if(!l) return;
+            if (history.length === 0) {
+                l.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--secondary-text);">No playback history yet.</div>';
+                return;
+            }
+            l.innerHTML = `
+                <div class="view-header"><h2>Playback History</h2><p>Last 100 tracks played to completion</p></div>
+                ${history.map((h, i) => `
+                    <div class="list-item" onclick="playTrack(${h.track_id}, '${jsesc(h.title)}', '${jsesc(h.artist_name)}')" oncontextmenu="showContextMenu(event, 'track', {id:${h.track_id}, title:'${jsesc(h.title)}', artist:'${jsesc(h.artist_name)}'})">
+                        <div class="row-no">${i+1}</div>
+                        <div class="artist-name">${esc(h.artist_name)}</div>
+                        <div class="album-title">${esc(h.title)} <span style="font-size:0.75rem; color:var(--secondary-text); margin-left:10px;">[${esc(h.album_title)}]</span></div>
+                        <div class="meta">${new Date(h.played_at).toLocaleString()}</div>
+                    </div>`).join('')}`;
+        }
+
+        async function loadAutogenPlaylist() {
+            try {
+                const r = await fetch('/api/autogen-playlist');
+                autogenPlaylist = await r.json();
+                renderAutogenPlaylist();
+            } catch(e) { console.error(e); }
+        }
+
+        async function playAutogenNow() {
+            if (autogenPlaylist.length === 0) return;
+            await clearQueue(false);
+            await addAutogenToQueue();
+            playTrackFromQueue(0);
+        }
+
+        function renderAutogenPlaylist() {
+            const l = document.getElementById('autogen-list'); if(!l) return;
+            if (autogenPlaylist.length === 0) {
+                l.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--secondary-text);">No tracks found. Try refreshing.</div>';
+                return;
+            }
+            l.innerHTML = `
+                <div class="view-header"><h2>Autogen Playlist</h2><p>${autogenPlaylist.length} tracks based on a random seed</p></div>
+                <div class="track-list">
+                    ${autogenPlaylist.map((t, i) => `
+                        <div class="track-item ${currentTrackId===t.id?'active':''}" id="track-autogen-${t.id}" oncontextmenu="showContextMenu(event, 'track', {id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(t.artist_name)}'})">
+                            <span class="track-no">${i+1}</span>
+                            <span class="track-title" onclick="playTrack(${t.id}, '${jsesc(t.title)}', '${jsesc(t.artist_name)}')">${esc(t.title)} <small style="color:var(--secondary-text)"> - ${esc(t.artist_name)}</small></span>
+                            <button class="icon-btn" onclick="addToQueue({id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(t.artist_name)}'})">+</button>
+                            <span class="track-duration">${formatTime(t.duration)}</span>
+                        </div>`).join('')}
+                </div>`;
+        }
+
+        async function addAutogenToQueue() {
+            if (autogenPlaylist.length === 0) return;
+            const ids = autogenPlaylist.map(t => t.id);
+            try {
+                await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:ids}) });
+                await syncQueueWithServer();
+            } catch(e) { console.error(e); }
+        }
+
+        async function addAutogenPlaylistToPlaylist() {
+            if (autogenPlaylist.length === 0) return;
+            const ids = autogenPlaylist.map(t => t.id);
+            const n = prompt('Enter playlist name:'); if(!n) return;
+            try {
+                const r = await fetch('/api/playlists', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:n}) });
+                const p = await r.json();
+                await addTracksToPlaylist(p.id, ids);
+                alert('Saved to playlist: ' + n);
+            } catch(e) { console.error(e); }
+        }
+
+        function onSearchInput(v) { 
+            const clearBtn = document.getElementById('clear-search');
+            if (clearBtn) clearBtn.style.display = v ? 'block' : 'none';
+            clearTimeout(searchDebounceTimer); 
+            searchDebounceTimer = setTimeout(() => { 
+                viewStates[currentView].search = v; 
+                if(viewStates[currentView].page) viewStates[currentView].page=1; 
+                loadCurrentView(); 
+            }, 400); 
+        }
+
+        function clearSearch() {
+            const input = document.getElementById('search-input');
+            if (input) {
+                input.value = '';
+                onSearchInput('');
+            }
+        }
+
+        function onSortChange(v) { viewStates[currentView].sort = v; viewStates[currentView].page = 1; loadCurrentView(); }
+        function toggleShuffle() { isShuffle = !isShuffle; const b = document.getElementById('shuffle-btn'); if(isShuffle) b.classList.add('active'); else b.classList.remove('active'); }
+        function toggleRepeat() { if(repeatMode==='none'){ repeatMode='all'; document.getElementById('repeat-btn').classList.add('active'); } else { repeatMode='none'; document.getElementById('repeat-btn').classList.remove('active'); } }
+        function changePage(p) { viewStates[currentView].page = p; loadCurrentView(); window.scrollTo(0,0); }
+
+        function renderPager(tc, cp, tp) {
+            const t = document.getElementById(`${currentView}-pager-top`), b = document.getElementById(`${currentView}-pager-bottom`);
+            if(!t || !b) return;
+            const h = tp <= 1 ? `<span class="pager-info">Showing all ${tc} items</span>` : `
+                <button class="btn" onclick="changePage(1)" ${cp===1?'disabled':''}>« First</button>
+                <button class="btn" onclick="changePage(${cp-1})" ${cp===1?'disabled':''}>‹ Prev</button>
+                <span class="pager-info">Page ${cp} of ${tp} (${tc} total)</span>
+                <button class="btn" onclick="changePage(${cp+1})" ${cp===tp?'disabled':''}>Next ›</button>
+                <button class="btn" onclick="changePage(${tp})" ${cp===tp?'disabled':''}>Last »</button>`;
+            t.innerHTML = h; b.innerHTML = h;
+        }
+
+        function renderAlbums(albs, lid, tc, si) {
+            const l = document.getElementById(lid); if(!l) return;
+            const fv = lid === 'random-list' ? 'random' : 'albums';
+            l.innerHTML = albs.map((a, i) => `
+                <div class="list-item" onclick="showTracks(${a.id}, '${jsesc(a.title)}', '${jsesc(a.artist_name)}', ${a.year}, '${fv}')" oncontextmenu="showContextMenu(event, 'album', {id:${a.id}, title:'${jsesc(a.title)}', artist:'${jsesc(a.artist_name)}'})">
+                    <div class="id-col">#${a.id}</div>
+                    <div class="row-no">${si + i + 1} / ${tc}</div>
+                    <div class="artist-name">${esc(a.artist_name || 'Unknown')}</div>
+                    <div class="album-title">${esc(a.title || 'Unknown')} <span style="font-size:0.75rem; color:var(--secondary-text); margin-left:10px;">[${esc(formatPath(a.folder_path))}]</span></div>
+                    <div class="meta">${a.year || ''} ${a.year&&a.mtime?'•':''} ${formatDate(a.mtime)}</div>
+                </div>`).join('');
+        }
+
+        function renderArtists(arts, tc, si) {
+            const l = document.getElementById('artist-list'); if(!l) return;
+            l.innerHTML = arts.map((a, i) => `
+                <div class="list-item" onclick="showArtistAlbums(${a.id}, '${jsesc(a.name)}')" oncontextmenu="showContextMenu(event, 'artist', {id:${a.id}, name:'${jsesc(a.name)}'})">
+                    <div class="id-col">#${a.id}</div>
+                    <div class="row-no">${si + i + 1} / ${tc}</div>
+                    <div class="artist-name">${esc(a.name || 'Unknown')}</div>
+                    <div class="album-title"><span style="font-size:0.75rem; color:var(--secondary-text);">[${esc(formatPath(a.folder_path))}]</span></div>
+                </div>`).join('');
+        }
+
+        async function showArtistAlbums(aid, aname) {
+            try {
+                const r = await fetch(`/api/artists/${aid}/albums`);
+                const albs = await r.json();
+                const l = document.getElementById('artist-list');
+                document.getElementById('artists-section').classList.remove('active');
+                l.innerHTML = `<div class="back-btn" onclick="switchView('artists')">← Back to Artists</div><div class="view-header"><h2>${esc(aname)}</h2></div>
+                    ${albs.map((a, i) => `
+                        <div class="list-item" onclick="showTracks(${a.id}, '${jsesc(a.title)}', '${jsesc(aname)}', ${a.year}, 'artist-detail', ${aid})" oncontextmenu="showContextMenu(event, 'album', {id:${a.id}, title:'${jsesc(a.title)}', artist:'${jsesc(aname)}'})">
+                            <div class="row-no">${i+1} / ${albs.length}</div>
+                            <div class="album-title">${esc(a.title)} <span style="font-size:0.75rem; color:var(--secondary-text); margin-left:10px;">[${esc(formatPath(a.folder_path))}]</span></div>
+                            <div class="meta">${a.year || ''} ${a.year&&a.mtime?'•':''} ${formatDate(a.mtime)}</div>
+                        </div>`).join('')}`;
+                document.getElementById('artists-section').classList.add('active');
+                const t = document.getElementById('artists-pager-top'), b = document.getElementById('artists-pager-bottom');
+                if(t) t.innerHTML = ''; if(b) b.innerHTML = '';
+            } catch(e){ console.error(e); }
+        }
+
+        async function browseFolder(p = '') {
+            try {
+                const r = await fetch(`/api/folders/browse?path=${encodeURIComponent(p)}`);
+                const res = await r.json();
+                viewStates.folders.path = res.currentPath;
+                document.getElementById('track-view').classList.add('hidden');
+                document.getElementById('folders-section').classList.add('active');
+                renderFoldersView(res);
+            } catch(e){ console.error(e); }
+        }
+
+        function renderFoldersView(res) {
+            const l = document.getElementById('folder-list'); if(!l) return;
+            const ti = res.folders.length + res.albums.length;
+            const parts = res.currentPath.split('/').filter(x => x !== '');
+            let h = `<div class="view-header"><p style="font-family:monospace; font-size:0.8rem; background:#eee; padding:5px 10px; border-radius:4px;">${esc(res.currentPath)}</p></div>`;
+            if (parts.length > 1) {
+                const parent = '/' + parts.slice(0, -1).join('/');
+                h += `<div class="list-item" onclick="browseFolder('${jsesc(parent)}')"><div class="row-no">-</div><div class="album-title" style="font-weight:bold;">.. (Go Up)</div></div>`;
+            }
+            h += res.folders.map((f, i) => `<div class="list-item" onclick="browseFolder('${jsesc(f.path)}')" oncontextmenu="showContextMenu(event, 'folder', {path:'${jsesc(f.path)}', name:'${jsesc(f.name)}'})"><div class="row-no">${i+1} / ${ti}</div><div class="album-title folder-icon">${esc(f.name)}</div></div>`).join('');
+            const offset = res.folders.length;
+            h += res.albums.map((a, i) => `
+                <div class="list-item" onclick="showTracks(${a.id}, '${jsesc(a.title)}', '${jsesc(a.artist_name)}', ${a.year}, 'folder-detail', '${jsesc(res.currentPath)}')" oncontextmenu="showContextMenu(event, 'album', {id:${a.id}, title:'${jsesc(a.title)}', artist:'${jsesc(a.artist_name)}'})">
+                    <div class="row-no">${offset+i+1} / ${ti}</div>
+                    <div class="artist-name">${esc(a.artist_name)}</div>
+                    <div class="album-title">${esc(a.title)}</div>
+                    <div class="meta">${a.year || ''} ${a.year&&a.mtime?'•':''} ${formatDate(a.mtime)}</div>
+                </div>`).join('');
+            l.innerHTML = h;
+        }
+
+        async function loadPlaylists() { await loadPlaylistsData(); renderPlaylists(); }
+        function renderPlaylists() {
+            const l = document.getElementById('playlist-list'); if(!l) return;
+            const q = viewStates.playlists.search.toLowerCase();
+            const f = playlistsData.filter(p => p.name.toLowerCase().includes(q));
+            l.innerHTML = f.map((p, i) => `
+                <div class="list-item" onclick="showPlaylistTracks(${p.id}, '${jsesc(p.name)}')" oncontextmenu="showContextMenu(event, 'playlist', {id:${p.id}, name:'${jsesc(p.name)}'})">
+                    <div class="row-no">${i+1} / ${f.length}</div>
+                    <div class="album-title" style="font-weight:600;">${esc(p.name)}</div>
+                    <div class="meta">${p.track_count} tracks</div>
+                </div>`).join('');
+        }
+
+        async function createNewPlaylist(its = []) {
+            const n = prompt('Enter playlist name:'); if(!n) return;
+            try {
+                const r = await fetch('/api/playlists', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:n}) });
+                const p = await r.json();
+                if(its.length > 0) await addTracksToPlaylist(p.id, its);
+                await loadPlaylists();
+            } catch(e){ console.error(e); }
+        }
+
+        async function deletePlaylist(id) { if(!confirm('Delete this playlist?')) return; try { await fetch(`/api/playlists/${id}`, {method:'DELETE'}); await loadPlaylists(); } catch(e){console.error(e);} }
+
+        async function showPlaylistTracks(pid, pname) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('track-view').classList.remove('hidden');
+            document.getElementById('track-back-btn').onclick = () => { document.getElementById('track-view').classList.add('hidden'); document.getElementById('playlists-section').classList.add('active'); };
+            const r = await fetch(`/api/playlists/${pid}/tracks`);
+            const ts = await r.json();
+            document.getElementById('track-content').innerHTML = `
+                <div class="view-header"><h2>${esc(pname)}</h2><p>${ts.length} tracks</p>
+                    <div class="btn-group">
+                        <button class="btn primary" onclick="playPlaylistNow(${pid})">Play All</button>
+                        <button class="btn" onclick="addPlaylistToQueue(${pid})">Add to Queue</button>
+                    </div>
+                </div>
+                <div class="track-list">
+                    ${ts.map((t, i) => `<div class="track-item" id="track-${t.id}" oncontextmenu="showContextMenu(event, 'track', {id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(t.artist_name)}'})">
+                        <span class="track-no">${i+1}</span>
+                        <span class="track-title" onclick="playTrack(${t.id}, '${jsesc(t.title)}', '${jsesc(t.artist_name)}')">${esc(t.title)} <small style="color:var(--secondary-text)"> - ${esc(t.artist_name)}</small></span>
+                        <button class="icon-btn" onclick="removeFromPlaylist(${pid}, ${t.playlist_track_id}, '${jsesc(pname)}')">×</button>
+                        <span class="track-duration">${formatTime(t.duration)}</span>
+                    </div>`).join('')}
+                </div>`;
+        }
+
+        async function playPlaylistNow(id) { await clearQueue(false); await addPlaylistToQueue(id, true); }
+        async function addTracksToPlaylist(pid, tids) { try { await fetch(`/api/playlists/${pid}/tracks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:tids}) }); await loadPlaylistsData(); } catch(e){console.error(e);} }
+        async function removeFromPlaylist(pid, ptid, pname) { try { await fetch(`/api/playlists/${pid}/tracks/${ptid}`, {method:'DELETE'}); showPlaylistTracks(pid, pname); } catch(e){console.error(e);} }
+
+        function showContextMenu(e, type, data) {
+            e.preventDefault();
+            const m = document.getElementById('context-menu');
+            m.style.display = 'block';
+            let x = e.clientX, y = e.clientY;
+            const winW = window.innerWidth, winH = window.innerHeight;
+            const menuW = 180, menuH = 250;
+            if (x + menuW > winW) x = winW - menuW - 10;
+            if (y + menuH > winH) y = winH - menuH - 10;
+            m.style.left = x + 'px'; m.style.top = y + 'px';
+            let h = '';
+            if (type === 'album') {
+                h = `<div class="menu-item" onclick="addAlbumToQueue(${data.id}, '${jsesc(data.title)}', '${jsesc(data.artist)}')">Add Album to Queue</div>
+                     <div class="menu-item" onclick="playAlbum(${data.id}, '${jsesc(data.title)}', '${jsesc(data.artist)}')">Play Album Now</div>
+                     <div class="menu-item" style="border-top:1px solid var(--border-color); font-weight:bold;">Add to Playlist:</div>
+                     ${playlistsData.map(p => `<div class="menu-item" onclick="addAlbumToPlaylist(${data.id}, ${p.id})">  ${esc(p.name)}</div>`).join('')}
+                     <div class="menu-item" onclick="addAlbumToPlaylist(${data.id}, null)">  + New Playlist...</div>`;
+            } else if (type === 'folder') {
+                h = `<div class="menu-item" onclick="addFolderToQueue('${jsesc(data.path)}')">Add All in Folder to Queue</div>
+                     <div class="menu-item" style="border-top:1px solid var(--border-color); font-weight:bold;">Add to Playlist:</div>
+                     ${playlistsData.map(p => `<div class="menu-item" onclick="addFolderToPlaylist('${jsesc(data.path)}', ${p.id})">  ${esc(p.name)}</div>`).join('')}
+                     <div class="menu-item" onclick="addFolderToPlaylist('${jsesc(data.path)}', null)">  + New Playlist...</div>`;
+            } else if (type === 'artist') {
+                h = `<div class="menu-item" onclick="addArtistToQueue(${data.id})">Add All Artist Tracks to Queue</div>`;
+            } else if (type === 'playlist') {
+                h = `<div class="menu-item" onclick="addPlaylistToQueue(${data.id})">Add Playlist to Queue</div>
+                     <div class="menu-item" onclick="deletePlaylist(${data.id})" style="color:#dc3545">Delete Playlist</div>`;
+            } else if (type === 'track') {
+                h = `<div class="menu-item" onclick="addToQueue({id:${data.id}, title:'${jsesc(data.title)}', artist:'${jsesc(data.artist)}'})">Add to Queue</div>
+                     <div class="menu-item" onclick="clearQueue(false).then(() => addToQueue({id:${data.id}, title:'${jsesc(data.title)}', artist:'${jsesc(data.artist)}'}, true))">Play Now</div>
+                     <div class="menu-item" style="border-top:1px solid var(--border-color); font-weight:bold;">Add to Playlist:</div>
+                     ${playlistsData.map(p => `<div class="menu-item" onclick="addTracksToPlaylist(${p.id}, [${data.id}])">  ${esc(p.name)}</div>`).join('')}
+                     <div class="menu-item" onclick="createNewPlaylist([${data.id}])">  + New Playlist...</div>`;
+            }
+            m.innerHTML = h;
+            setTimeout(() => { document.addEventListener('click', hideContextMenu, { once: true }); }, 0);
+        }
+        function hideContextMenu() { document.getElementById('context-menu').style.display = 'none'; }
+
+        async function addAlbumToPlaylist(aid, pid) {
+            const r = await fetch(`/api/albums/${aid}/tracks`);
+            const ts = await r.json();
+            const ids = ts.map(t => t.id);
+            if (!pid) await createNewPlaylist(ids); else await addTracksToPlaylist(pid, ids);
+        }
+
+        async function addFolderToPlaylist(p, pid) {
+            const r = await fetch(`/api/folders/tracks?path=${encodeURIComponent(p)}`);
+            const ts = await r.json();
+            const ids = ts.map(t => t.id);
+            if (!pid) await createNewPlaylist(ids); else await addTracksToPlaylist(pid, ids);
+        }
+
+        async function addPlaylistToQueue(id, playNow = false) {
+            const r = await fetch(`/api/playlists/${id}/tracks`);
+            const ts = await r.json();
+            const ids = ts.map(t => t.id);
+            await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:ids}) });
+            await syncQueueWithServer();
+            if (playNow) playTrackFromQueue(playQueue.length - ids.length);
+        }
+
+        function toggleQueue() { document.getElementById('queue-view').classList.toggle('open'); }
+        async function addToQueue(t, playNow = false) {
+            try {
+                await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:[t.id]}) });
+                await syncQueueWithServer();
+                if (playNow) playTrackFromQueue(playQueue.length - 1);
+            } catch(e){console.error(e);}
+        }
+        async function addAlbumToQueue(aid, title, art, playNow = false) {
+            const r = await fetch(`/api/albums/${aid}/tracks`);
+            const ts = await r.json();
+            await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:ts.map(t=>t.id)}) });
+            await syncQueueWithServer();
+            if (playNow) playTrackFromQueue(playQueue.length - ts.length);
+        }
+        async function addArtistToQueue(aid) {
+            const r = await fetch(`/api/artists/${aid}/tracks`);
+            const ts = await r.json();
+            await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:ts.map(t=>t.id)}) });
+            await syncQueueWithServer();
+        }
+        async function addFolderToQueue(p) {
+            const r = await fetch(`/api/folders/tracks?path=${encodeURIComponent(p)}`);
+            const ts = await r.json();
+            await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:ts.map(t=>t.id)}) });
+            await syncQueueWithServer();
+        }
+        async function playAlbum(aid, title, art) { await clearQueue(false); await addAlbumToQueue(aid, title, art, true); }
+        function renderQueue() {
+            const l = document.getElementById('queue-list'); if(!l) return;
+            const total = playQueue.length;
+            l.innerHTML = playQueue.map((t, i) => `
+               <div class="queue-item ${currentQueueIndex === i ? 'active' : ''}" id="queue-item-${i}" onclick="playTrackFromQueue(${i})" oncontextmenu="showContextMenu(event, 'track', {id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(t.artist_name || t.artist)}'})">
+                   <div style="font-size:0.7rem; color:var(--secondary-text); margin-right:8px; min-width:30px;">${i+1}/${total}</div>                    <div class="track-info"><div>${esc(t.title)}</div><div style="font-size:0.7rem; color:var(--secondary-text);">${esc(t.artist_name || 'Unknown')}</div></div>
+                    <span class="remove-btn" onclick="event.stopPropagation(); removeFromQueue(${i})">×</span>
+                </div>`).join('');
+            
+            if (currentQueueIndex !== -1) {
+                const activeItem = document.getElementById(`queue-item-${currentQueueIndex}`);
+                if (activeItem) {
+                    activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+        }
+        async function removeFromQueue(i) {
+            const item = playQueue[i]; if(!item) return;
+            await fetch(`/api/queue/${item.queue_id}`, { method:'DELETE' });
+            if(currentQueueIndex === i){ currentQueueIndex = -1; audio.pause(); audio.src = ''; }
+            else if(currentQueueIndex > i) currentQueueIndex--;
+            await syncQueueWithServer();
+        }
+        async function clearQueue(ref = true) {
+            await fetch('/api/queue/clear', { method:'POST' });
+            playQueue = []; currentQueueIndex = -1; audio.pause(); audio.src = '';
+            if(ref){ renderQueue(); document.getElementById('player-title').innerText = 'Not Playing'; document.getElementById('player-artist').innerText = ''; }
+            await savePlaybackState();
+        }
+
+        async function showTracks(aid, title, art, year, fv, fparam) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('track-view').classList.remove('hidden');
+            const bb = document.getElementById('track-back-btn');
+            if (fv === 'albums') bb.onclick = () => { document.getElementById('track-view').classList.add('hidden'); document.getElementById('albums-section').classList.add('active'); };
+            else if (fv === 'random') bb.onclick = () => { document.getElementById('track-view').classList.add('hidden'); document.getElementById('random-section').classList.add('active'); };
+            else if (fv === 'artist-detail') bb.onclick = () => showArtistAlbums(fparam, art);
+            else if (fv === 'folder-detail') bb.onclick = () => browseFolder(fparam);
+            const r = await fetch(`/api/albums/${aid}/tracks`);
+            const ts = await r.json();
+            document.getElementById('track-content').innerHTML = `
+                <div class="view-header"><h2>${esc(title)}</h2><p>${esc(art)} ${year?'• '+year:''}</p>
+                    <div class="btn-group">
+                        <button class="btn primary" onclick="playAlbum(${aid}, '${jsesc(title)}', '${jsesc(art)}')">Play All</button>
+                        <button class="btn" onclick="addAlbumToQueue(${aid}, '${jsesc(title)}', '${jsesc(art)}')">Add to Queue</button>
+                    </div>
+                </div>
+                <div class="track-list">
+                    ${ts.map(t => `<div class="track-item ${currentTrackId===t.id?'active':''}" id="track-${t.id}" oncontextmenu="showContextMenu(event, 'track', {id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(art)}'})">
+                        <span class="track-no">${t.track_number || '-'}</span>                        <span class="track-title" onclick="playTrack(${t.id}, '${jsesc(t.title)}', '${jsesc(art)}')">${esc(t.title)}</span>
+                        <button class="icon-btn" onclick="addToQueue({id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(art)}'})">+</button>
+                        <span class="track-duration">${formatTime(t.duration)}</span>
+                    </div>`).join('')}
+                </div>`;
+            window.scrollTo(0,0);
+        }
+
+        function playTrackFromQueue(i) { if(i<0 || i>=playQueue.length) return; currentQueueIndex = i; const t = playQueue[i]; playTrack(t.id, t.title, t.artist_name || t.artist); renderQueue(); }
+        async function playNext() {
+            if(playQueue.length === 0) return;
+            if(isShuffle){ playTrackFromQueue(Math.floor(Math.random()*playQueue.length)); return; }
+            if(currentQueueIndex < playQueue.length - 1) {
+                playTrackFromQueue(currentQueueIndex + 1);
+            } else {
+                if(isAutoplay && !isShuffle && currentTrackId) {
+                    try {
+                        const r = await fetch(`/api/recommendations/${currentTrackId}?limit=5`);
+                        const recs = await r.json();
+                        if (recs && recs.length > 0) {
+                            await fetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trackIds:recs.map(t=>t.id)}) });
+                            await syncQueueWithServer();
+                            playTrackFromQueue(currentQueueIndex + 1);
+                            return;
+                        }
+                    } catch(e) { console.error(e); }
+                }
+                if(repeatMode === 'all') playTrackFromQueue(0);
+            }
+        }
+        function playPrev() { if(currentQueueIndex > 0) playTrackFromQueue(currentQueueIndex - 1); else audio.currentTime = 0; }
+        audio.onended = async () => {
+            if (currentTrackId) {
+                try {
+                    const res = await fetch('/api/history', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ trackId: currentTrackId })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        console.error('Failed to record history:', err);
+                    }
+                } catch (e) { console.error('Failed to record history error:', e); }
+            }
+            playNext();
+        };
+        function playTrack(id, title, art) {
+            if(currentTrackId){ 
+                const p = document.getElementById(`track-${currentTrackId}`); if(p) p.classList.remove('active');
+                const pa = document.getElementById(`track-autogen-${currentTrackId}`); if(pa) pa.classList.remove('active');
+            }
+            currentTrackId = id; 
+            const c = document.getElementById(`track-${id}`); if(c) c.classList.add('active');
+            const ca = document.getElementById(`track-autogen-${id}`); if(ca) ca.classList.add('active');
+            audio.src = `/api/stream/${id}`; audio.play().catch(e => console.error(e));
+            document.getElementById('player-title').innerText = title; document.getElementById('player-artist').innerText = art;
+            document.getElementById('play-pause-btn').innerText = '⏸';
+            savePlaybackState();
+        }
+        function togglePlay() { if(!audio.src){ if(playQueue.length>0) playTrackFromQueue(0); return; } if(audio.paused){ audio.play(); document.getElementById('play-pause-btn').innerText='⏸'; } else { audio.pause(); document.getElementById('play-pause-btn').innerText='▶'; } }
+        function formatTime(s) { if(!s||isNaN(s)) return '0:00'; const m=Math.floor(s/60), sec=Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`; }
+        audio.ontimeupdate = () => { if(!audio.duration) return; const p = (audio.currentTime / audio.duration)*100; document.getElementById('progress-fill').style.width = p+'%'; document.getElementById('current-time').innerText = formatTime(audio.currentTime); document.getElementById('total-time').innerText = formatTime(audio.duration); };
+        function seek(e) { if(!audio.duration) return; const b = document.getElementById('progress-bar'), p = e.offsetX / b.offsetWidth; audio.currentTime = p * audio.duration; }
+        window.onload = init;
+    </script>
+</body>
+</html>
