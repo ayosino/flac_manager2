@@ -27,7 +27,7 @@ import { AlbumRow, TrackRow, Pager } from '../components/UnifiedRows';
  */
 export function AlbumsView() {
   const { viewFilters, setViewFilters } = useApp();
-  const { page, search, sort } = viewFilters.albums;
+  const { page, search, sort, genre } = viewFilters.albums;
   const [data, setData] = useState({ data: [], totalCount: 0, page: 1, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const limit = 50;
@@ -41,6 +41,7 @@ export function AlbumsView() {
       sort: sort || 'alpha'
     });
     if (search) params.set('search', search);
+    if (genre) params.set('genre', genre);
 
     fetch(`/api/albums?${params.toString()}`)
       .then(r => r.json())
@@ -57,7 +58,7 @@ export function AlbumsView() {
       })
       .catch(() => active && setLoading(false));
     return () => { active = false; };
-  }, [page, search, sort]);
+  }, [page, search, sort, genre]);
 
   const handlePageChange = (newPage) => {
     setViewFilters(prev => ({
@@ -313,7 +314,7 @@ export function AlbumDetailView() {
 export function ArtistsView() {
   const navigate = useNavigate();
   const { viewFilters, setViewFilters, displayMode, openContextMenu } = useApp();
-  const { page, search, sort } = viewFilters.artists;
+  const { page, search, sort, genre } = viewFilters.artists;
   const [data, setData] = useState({ data: [], totalCount: 0, page: 1, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const limit = 50;
@@ -328,6 +329,7 @@ export function ArtistsView() {
       sort: sort || 'alpha'
     });
     if (search) params.set('search', search);
+    if (genre) params.set('genre', genre);
 
     fetch(`/api/artists?${params.toString()}`)
       .then(r => r.json())
@@ -344,7 +346,7 @@ export function ArtistsView() {
       })
       .catch(() => active && setLoading(false));
     return () => { active = false; };
-  }, [page, search, sort]);
+  }, [page, search, sort, genre]);
 
   const handlePageChange = (newPage) => {
     setViewFilters(prev => ({
@@ -802,19 +804,23 @@ export function PlaylistDetailView() {
  * 7. Random View (/random)
  */
 export function RandomView() {
+  const { viewFilters } = useApp();
+  const genre = viewFilters.random?.genre || '';
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadRandom = useCallback(() => {
     setLoading(true);
-    fetch('/api/random?limit=20')
+    const params = new URLSearchParams({ limit: '20' });
+    if (genre) params.set('genre', genre);
+    fetch(`/api/random?${params.toString()}`)
       .then(r => r.json())
       .then(res => {
         setAlbums(res.data || []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [genre]);
 
   useEffect(() => {
     loadRandom();
@@ -1074,6 +1080,10 @@ export function SettingsView() {
           <div className="flex justify-between py-1 border-b border-[var(--border-color)]">
             <span className="text-[var(--text-secondary)]">Toggle Queue Drawer</span>
             <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)]">q</kbd>
+          </div>
+          <div className="flex justify-between py-1 border-b border-[var(--border-color)]">
+            <span className="text-[var(--text-secondary)]">Clear Play Queue</span>
+            <kbd className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)]">c</kbd>
           </div>
           <div className="flex justify-between py-1 border-b border-[var(--border-color)]">
             <span className="text-[var(--text-secondary)]">Next Track</span>

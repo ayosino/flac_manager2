@@ -38,16 +38,18 @@ const TABS = [
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { viewFilters, setViewFilters } = useApp();
+  const { viewFilters, setViewFilters, genres } = useApp();
 
   // Determine active top-level tab from URL path
   const activeTab = TABS.find(t => location.pathname.startsWith(t.path))?.id || 'albums';
 
   const supportsSearch = activeTab === 'albums' || activeTab === 'artists' || activeTab === 'playlists';
   const supportsSort = activeTab === 'albums' || activeTab === 'artists';
+  const supportsGenre = activeTab === 'albums' || activeTab === 'artists' || activeTab === 'random';
 
   const currentSearch = viewFilters[activeTab]?.search || '';
   const currentSort = viewFilters[activeTab]?.sort || 'alpha';
+  const currentGenre = viewFilters[activeTab]?.genre || '';
 
   const [inputVal, setInputVal] = useState(currentSearch);
   const debounceRef = useRef(null);
@@ -90,23 +92,57 @@ export default function App() {
     }));
   };
 
+  const handleGenreChange = (val) => {
+    if (!supportsGenre) return;
+    setViewFilters(prev => ({
+      ...prev,
+      [activeTab]: {
+        ...prev[activeTab],
+        genre: val,
+        ...(prev[activeTab]?.page ? { page: 1 } : {})
+      }
+    }));
+    if (activeTab === 'albums' && location.pathname !== '/albums') {
+      navigate('/albums');
+    } else if (activeTab === 'artists' && location.pathname !== '/artists') {
+      navigate('/artists');
+    }
+  };
+
   return (
     <div className="min-h-screen pb-[84px] bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Top Sticky Header */}
       <header className="sticky top-0 z-30 h-12 px-5 bg-[var(--bg-primary)] border-b border-[var(--border-color)] flex items-center justify-between gap-4">
         <h1
           onClick={() => navigate('/albums')}
-          className="text-base font-bold m-0 tracking-tight cursor-pointer hover:text-[var(--accent)] transition-colors"
+          className="text-base font-bold m-0 tracking-tight cursor-pointer hover:text-[var(--accent)] transition-colors shrink-0"
         >
           Theatre of Eternal Music
         </h1>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          {supportsGenre && (
+            <select
+              value={currentGenre}
+              onChange={(e) => handleGenreChange(e.target.value)}
+              className="px-2.5 py-1 text-xs rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+              title="Filter by Genre"
+            >
+              <option value="">All Genres</option>
+              {genres.map(g => (
+                <option key={g.genre} value={g.genre}>
+                  {g.genre} ({g.album_count})
+                </option>
+              ))}
+            </select>
+          )}
+
           {supportsSort && (
             <select
               value={currentSort}
               onChange={(e) => handleSortChange(e.target.value)}
               className="px-2.5 py-1 text-xs rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+              title="Sort Order"
             >
               <option value="alpha">A–Z</option>
               <option value="newest">Modified Date</option>

@@ -6,12 +6,35 @@ const { pool, EXCLUDE_DIRS, getExcludeClause, getExcludeParams } = require('../c
 
 const router = express.Router();
 
-// GET /api/albums - Paginated, searchable, sortable album list
+// GET /api/genres - List available genres (manual_genre) with album counts
+router.get('/genres', async (req, res) => {
+  try {
+    let whereClause = 'WHERE a.manual_genre IS NOT NULL AND a.manual_genre != ""';
+    const params = [];
+    whereClause += getExcludeClause('a');
+    params.push(...getExcludeParams());
+
+    const [rows] = await pool.query(
+      `SELECT a.manual_genre as genre, COUNT(*) as album_count
+       FROM albums a
+       ${whereClause}
+       GROUP BY a.manual_genre
+       ORDER BY a.manual_genre ASC`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/albums - Paginated, searchable, sortable, genre-filterable album list
 router.get('/albums', async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 50;
     const search = (req.query.search || '').trim();
+    const genre = (req.query.genre || '').trim();
     const sort = req.query.sort || 'alpha';
     const offset = (page - 1) * limit;
 
@@ -20,6 +43,11 @@ router.get('/albums', async (req, res) => {
 
     whereClause += getExcludeClause('a');
     params.push(...getExcludeParams());
+
+    if (genre) {
+      whereClause += ' AND a.manual_genre = ?';
+      params.push(genre);
+    }
 
     if (search) {
       const searchKana = wanakana.toKatakana(search);
@@ -116,14 +144,20 @@ router.get('/albums/:id/tracks', async (req, res) => {
   }
 });
 
-// GET /api/random - Random albums
+// GET /api/random - Random albums (optionally filtered by genre)
 router.get('/random', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 20;
+    const genre = (req.query.genre || '').trim();
     let whereClause = 'WHERE 1=1';
     const params = [];
     whereClause += getExcludeClause('a');
     params.push(...getExcludeParams());
+
+    if (genre) {
+      whereClause += ' AND a.manual_genre = ?';
+      params.push(genre);
+    }
 
     const [rows] = await pool.query(
       `SELECT a.id, a.artist_id, a.title, a.year, a.cover_url, a.folder_path, a.manual_genre, a.mtime, a.added_at,
@@ -148,12 +182,13 @@ router.get('/random', async (req, res) => {
   }
 });
 
-// GET /api/artists - Paginated, searchable, sortable artists
+// GET /api/artists - Paginated, searchable, sortable, genre-filterable artists
 router.get('/artists', async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 50;
     const search = (req.query.search || '').trim();
+    const genre = (req.query.genre || '').trim();
     const sort = req.query.sort || 'alpha';
     const offset = (page - 1) * limit;
 
@@ -166,6 +201,14 @@ router.get('/artists', async (req, res) => {
         OR EXISTS (SELECT 1 FROM tracks tr JOIN albums alb2 ON tr.album_id = alb2.id WHERE tr.artist_id = artists.id ${getExcludeClause('alb2')})
       )`;
       params.push(...getExcludeParams(), ...getExcludeParams());
+    }
+
+    if (genre) {
+      whereClause += ` AND (
+        EXISTS (SELECT 1 FROM albums alb WHERE alb.artist_id = artists.id AND alb.manual_genre = ?)
+        OR EXISTS (SELECT 1 FROM tracks tr WHERE tr.artist_id = artists.id AND tr.manual_genre = ?)
+      )`;
+      params.push(genre, genre);
     }
 
     if (search) {

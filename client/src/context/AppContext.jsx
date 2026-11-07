@@ -64,8 +64,9 @@ export function AppProvider({ children }) {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const isQueueLoadedRef = useRef(false);
 
-  // Playlists
+  // Playlists & Genres
   const [playlists, setPlaylists] = useState([]);
+  const [genres, setGenres] = useState([]);
 
   // Overlays: Context Menu, Modal, Lightbox, Toasts
   const [contextMenu, setContextMenu] = useState(null);
@@ -73,10 +74,11 @@ export function AppProvider({ children }) {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [toasts, setToasts] = useState([]);
 
-  // Search & Sort state per view
+  // Search, Sort & Genre filter state per view
   const [viewFilters, setViewFilters] = useState({
-    albums: { page: 1, search: '', sort: 'alpha' },
-    artists: { page: 1, search: '', sort: 'alpha' },
+    albums: { page: 1, search: '', sort: 'alpha', genre: '' },
+    artists: { page: 1, search: '', sort: 'alpha', genre: '' },
+    random: { genre: '' },
     playlists: { search: '' }
   });
 
@@ -138,6 +140,16 @@ export function AppProvider({ children }) {
       setPlaylists(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error('Failed to load playlists:', e);
+    }
+  }, []);
+
+  const loadGenres = useCallback(async () => {
+    try {
+      const res = await fetch('/api/genres');
+      const data = await res.json();
+      setGenres(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Failed to load genres:', e);
     }
   }, []);
 
@@ -407,11 +419,11 @@ export function AppProvider({ children }) {
     addToast(`Deleted playlist "${name || ''}"`);
   }, [loadPlaylists, addToast]);
 
-  // Initial load: queue, playback state, playlists
+  // Initial load: queue, playback state, playlists, genres
   useEffect(() => {
     (async () => {
       const q = await syncQueue();
-      await loadPlaylists();
+      await Promise.all([loadPlaylists(), loadGenres()]);
       try {
         const res = await fetch('/api/playback-state');
         const state = await res.json();
@@ -425,7 +437,7 @@ export function AppProvider({ children }) {
         console.error('Failed to restore playback state:', e);
       }
     })();
-  }, [syncQueue, loadPlaylists, startTrackPlayback]);
+  }, [syncQueue, loadPlaylists, loadGenres, startTrackPlayback]);
 
   // Audio Element Event Listeners
   useEffect(() => {
@@ -481,12 +493,15 @@ export function AppProvider({ children }) {
     const onKeyDown = (e) => {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === ' ') {
         e.preventDefault();
         togglePlay();
       } else if (k === 'q') {
         setIsQueueOpen(prev => !prev);
+      } else if (k === 'c') {
+        clearQueue(true);
       } else if (k === 'k') {
         changeVolume(0.05);
       } else if (k === 'j') {
@@ -503,7 +518,7 @@ export function AppProvider({ children }) {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [togglePlay, changeVolume, playNext, playPrev]);
+  }, [togglePlay, clearQueue, changeVolume, playNext, playPrev]);
 
   const openContextMenu = useCallback((e, type, data) => {
     e.preventDefault();
@@ -541,6 +556,7 @@ export function AppProvider({ children }) {
     setIsQueueOpen,
     playlists,
     loadPlaylists,
+    genres,
     viewFilters,
     setViewFilters,
     togglePlay,
