@@ -6,16 +6,17 @@ const mm = require('music-metadata');
 const kuromoji = require('kuromoji');
 
 const MUSIC_DIR = process.env.MUSIC_DIR;
-const EXCLUDE_DIRS = process.env.EXCLUDE_DIRS ? process.env.EXCLUDE_DIRS.split(',').map(d => d.trim()) : [];
-const COVERS_DIR = path.join(__dirname, 'public', 'covers');
-
+const EXCLUDE_DIRS = process.env.EXCLUDE_DIRS
+  ? process.env.EXCLUDE_DIRS.split(',').map(d => d.trim()).filter(Boolean)
+  : [];
+const COVERS_DIR = path.join(__dirname, '..', '..', 'public', 'covers');
 const isFullScan = process.argv.includes('--full');
 
 let tokenizer = null;
 
 function initTokenizer() {
   return new Promise((resolve, reject) => {
-    kuromoji.builder({ dicPath: 'node_modules/kuromoji/dict' }).build((err, _tokenizer) => {
+    kuromoji.builder({ dicPath: path.join(__dirname, '..', '..', 'node_modules', 'kuromoji', 'dict') }).build((err, _tokenizer) => {
       if (err) return reject(err);
       tokenizer = _tokenizer;
       resolve();
@@ -30,6 +31,10 @@ function getReading(text) {
 }
 
 async function scan() {
+  if (!fs.existsSync(COVERS_DIR)) {
+    fs.mkdirSync(COVERS_DIR, { recursive: true });
+  }
+
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -39,7 +44,7 @@ async function scan() {
 
   console.log('Connected to MySQL. Initializing tokenizer...');
   await initTokenizer();
-  
+
   const trackMap = new Map();
   if (!isFullScan) {
     console.log('Loading existing tracks for delta scan...');
@@ -52,18 +57,18 @@ async function scan() {
     console.log(`Loaded ${trackMap.size} tracks from database.`);
   }
 
-  console.log('Starting scan...');
-
   async function getOrCreateArtist(name, reading) {
     const [artists] = await connection.query('SELECT id FROM artists WHERE name = ?', [name]);
     if (artists.length === 0) {
-      const [result] = await connection.query('INSERT INTO artists (name, name_reading) VALUES (?, ?)', [name, reading]);
+      const [result] = await connection.query(
+        'INSERT INTO artists (name, name_reading) VALUES (?, ?)',
+        [name, reading]
+      );
       return result.insertId;
-    } else {
-      const artistId = artists[0].id;
-      await connection.query('UPDATE artists SET name_reading = ? WHERE id = ?', [reading, artistId]);
-      return artistId;
     }
+    const artistId = artists[0].id;
+    await connection.query('UPDATE artists SET name_reading = ? WHERE id = ?', [reading, artistId]);
+    return artistId;
   }
 
   async function walk(dir) {
@@ -105,7 +110,7 @@ async function scan() {
       const folderArtist = relParts[1] || null;
       const folderAlbum = relParts[relParts.length - 1] || null;
 
-      let rawArtist = (common.artist && common.artist.trim()) ? common.artist.trim() : null;
+      const rawArtist = (common.artist && common.artist.trim()) ? common.artist.trim() : null;
       let albumArtistName = (common.albumartist && common.albumartist.trim())
         ? common.albumartist.trim()
         : (folderArtist === 'Various Artists' ? 'Various Artists' : (rawArtist || folderArtist || 'Unknown Artist'));
@@ -121,12 +126,10 @@ async function scan() {
       const year = common.year || null;
       const duration = Math.round(format.duration || 0);
 
-      // Custom rule: Treat "autotune the world" and "Studio Simpa" compilation albums as "Various Artists"
       if (albumArtistName === 'autotune the world' || albumTitle.includes('Studio Simpa')) {
         albumArtistName = 'Various Artists';
       }
 
-      // Resolve Track Artist (especially for Various Artists compilations)
       let trackArtistName = rawArtist || albumArtistName;
       if (trackArtistName === 'Various Artists') {
         const titleMatch = trackTitle.match(/^(.+?)\s+-\s+(.+)$/);
@@ -140,23 +143,21 @@ async function scan() {
       const albumReading = getReading(albumTitle);
       const trackReading = getReading(trackTitle);
 
-      // 1. Get or Create Album Artist & Track Artist
       const albumArtistId = await getOrCreateArtist(albumArtistName, albumArtistReading);
       const trackArtistId = trackArtistName === albumArtistName
         ? albumArtistId
         : await getOrCreateArtist(trackArtistName, trackArtistReading);
 
-      // 2. Get or Create Album (keyed by physical folder_path to prevent cross-folder collisions)
-      let [albums] = await connection.query('SELECT id FROM albums WHERE folder_path = ?', [dir]);
+      const [albums] = await connection.query('SELECT id FROM albums WHERE folder_path = ?', [dir]);
       let albumId;
       if (albums.length === 0) {
         const [result] = await connection.query(
-          'INSERT INTO albums (artist_id, title, year, folder_path, mtime, title_reading, manual_genre, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+          `INSERT INTO albums (artist_id, title, year, folder_path, mtime, title_reading, manual_genre, added_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
           [albumArtistId, albumTitle, year, dir, mtime, albumReading, manualGenre]
         );
         albumId = result.insertId;
-        
-        // Handle Cover Art
+
         let coverData = null;
         let coverExt = 'jpg';
 
@@ -189,7 +190,6 @@ async function scan() {
         );
       }
 
-      // 3. Insert or Update Track
       const [tracks] = await connection.query('SELECT id FROM tracks WHERE file_path = ?', [filePath]);
       if (tracks.length === 0) {
         await connection.query(
@@ -210,6 +210,7 @@ async function scan() {
     }
   }
 
+  console.log('Starting directory walk...');
   await walk(MUSIC_DIR);
   console.log('Scan complete.');
   await connection.end();

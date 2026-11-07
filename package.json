@@ -1,17 +1,17 @@
 {
-  "name": "flac-manager",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "flac-manager2",
+  "version": "2.0.0",
+  "description": "Self-hosted FLAC Music Manager (Theatre of Eternal Music)",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js",
-    "scan": "node metadata_scanner.js",
-    "init-db": "node init_db.js",
-    "setup": "npm install && node init_db.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server/index.js",
+    "build": "npm --prefix client run build",
+    "dev:client": "npm --prefix client run dev",
+    "scan": "node server/scripts/scanner.js",
+    "scan:full": "node server/scripts/scanner.js --full",
+    "init-db": "node server/scripts/initDb.js",
+    "setup": "npm install && npm --prefix client install && npm run build"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

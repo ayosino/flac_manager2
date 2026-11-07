@@ -1,59 +1,42 @@
-# FLAC Music Manager
+# FLAC Music Manager v2 (Theatre of Eternal Music)
 
-FLAC音楽ファイルをMySQLで管理し、Webブラウザで再生するためのシンプルなセルフホスト型ツールです。
+MySQLとNode.js (Express) + React (Vite + Tailwind CSS) で構築された、セルフホスト型FLAC音楽ライブラリ管理＆ストリーミングプレイヤーです。
 
-## 特徴
-- 📁 ローカルの音楽フォルダを再帰的にスキャン
-- 🏷️ FLACのメタデータ（アーティスト、アルバム、曲名など）を自動抽出
-- 🐘 MySQLを使用した高速なライブラリ管理
-- 🌐 画像なしのシンプルなリスト形式UI（ブラウザ再生対応）
-- 🚀 Node.jsで動作
+## 主な特徴
+- **テキスト主体の高密度・統一UI**: 全ビュー（Albums, Artists, Folders, Playlists, Random, Autogen, History）で統一されたリストコンポーネント（`AlbumRow`, `TrackRow`）を採用。
+- **アルバム詳細＆プレイヤーでのカバーアート表示**: アルバム詳細画面でのカバーアート表示（クリックで拡大ライトボックス対応）およびプレイヤーバーでのミニサムネイル表示に対応。
+- **マルチディスク＆コンピレーション完全対応**: 複数枚組アルバムの `disc_number` 管理、および `Various Artists` コンピレーションアルバムにおける曲単位のアーティスト（`track_artist`）表示・逆引きに対応。
+- **FAISS ベクトル類似検索**: 楽曲の特徴量ベクトルを用いた Autoplay（キュー末尾での自動推薦追加）および Autogen プレイリスト生成に対応。
+- **サーバーサイド永続化キュー＆レジューム**: 再生キュー（`play_queue`）と再生位置（`playback_state`）をMySQLに自動保存し、リロードや別端末でも再生状態を復元。
 
-## システム要件
-- Node.js (v18以上推奨)
-- MySQL サーバー
-
-## インストール手順
-
-### 1. プロジェクトのダウンロード
-このプロジェクトディレクトリを任意の場所に配置します。
-
-### 2. 依存パッケージのインストール
-```bash
-npm install
+## ディレクトリ構成
+```text
+├── client/                 # React + Vite + Tailwind CSS フロントエンド
+│   ├── src/
+│   │   ├── components/     # 共通UI部品 (AlbumRow, TrackRow, PlayerBar, QueueDrawer, ContextMenu 等)
+│   │   ├── context/        # グローバル状態・プレイヤー制御 (AppContext)
+│   │   └── views/          # 8タブ画面 + アルバム/アーティスト/プレイリスト詳細画面
+├── server/                 # Express バックエンドサーバー
+│   ├── config/             # MySQL コネクションプール & 除外ディレクトリ設定
+│   ├── routes/             # API ルート (libraryRoutes, playerRoutes, playlistRoutes)
+│   ├── services/           # FAISS 類似検索・Autogen サービス
+│   └── scripts/            # メタデータスキャナー (scanner.js) & DB初期化 (initDb.js)
+├── database/               # SQL スキーマ (schema.sql) & Grafana ビュー定義 (views.sql)
+└── public/covers/          # 抽出されたアルバムカバー画像
 ```
 
-### 3. 設定ファイルの作成
-`.env.example` を `.env` にコピーし、お使いの環境（MySQL接続情報、音楽ディレクトリのパス）に合わせて編集します。
+## セットアップ ＆ 起動手順
 
 ```bash
-cp .env.example .env
-vi .env
-```
+# 初回セットアップ（依存パッケージのインストール & フロントエンドビルド）
+npm run setup
 
-### 4. データベースの初期化
-初回実行時、またはデータベースをリセットしたい時に実行します。
-```bash
+# データベーステーブル & Grafana View の初期化（必要な場合）
 npm run init-db
-```
 
-### 5. 音楽ライブラリのスキャン
-指定した `MUSIC_DIR` 内のFLACファイルをスキャンし、データベースを構築します。
-```bash
+# 音楽ライブラリの差分スキャン（全件再スキャンは npm run scan:full）
 npm run scan
-```
 
-### 6. サーバーの起動
-```bash
+# サーバー起動 (デフォルト: http://localhost:3000)
 npm start
 ```
-起動後、ブラウザで `http://localhost:3000` にアクセスしてください。
-
-## 使い方
-- アルバム一覧が表示されます。
-- アーティストまたはアルバムをクリックすると、そのアルバムの曲一覧に移動します。
-- 曲をクリックすると再生が開始されます。
-- 「Back to Albums」で一覧に戻れます。
-
-## ライセンス
-ISC
