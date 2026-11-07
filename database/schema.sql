@@ -1,5 +1,5 @@
 -- ========================================================
--- FLAC Music Manager Database Schema (Optimized v2)
+-- FLAC Music Manager Database Schema (Optimized v2 - Items 1, 2, 4 Applied)
 -- Default Charset: utf8mb4, Collation: utf8mb4_unicode_ci
 -- ========================================================
 
@@ -26,11 +26,12 @@ CREATE TABLE IF NOT EXISTS albums (
     title_reading VARCHAR(255),
     manual_genre VARCHAR(100),
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_album_folder (folder_path(255)),
     INDEX idx_album_artist (artist_id),
     INDEX idx_album_mtime (mtime),
     INDEX idx_album_added_at (added_at),
-    INDEX idx_album_folder (folder_path(255)),
-    UNIQUE KEY uk_artist_album (artist_id, title),
+    INDEX idx_album_manual_genre (manual_genre),
+    INDEX idx_album_title_reading (title_reading),
     CONSTRAINT fk_albums_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -38,6 +39,9 @@ CREATE TABLE IF NOT EXISTS albums (
 CREATE TABLE IF NOT EXISTS tracks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     album_id INT,
+    artist_id INT DEFAULT NULL,
+    track_artist VARCHAR(255) DEFAULT NULL,
+    track_artist_reading VARCHAR(255) DEFAULT NULL,
     title VARCHAR(255) NOT NULL,
     track_number INT,
     disc_number INT DEFAULT 1,
@@ -54,9 +58,13 @@ CREATE TABLE IF NOT EXISTS tracks (
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_track_file_path (file_path),
     INDEX idx_track_album_disc_no (album_id, disc_number, track_number),
+    INDEX idx_track_artist (artist_id),
     INDEX idx_track_mtime (mtime),
     INDEX idx_track_added_at (added_at),
-    CONSTRAINT fk_tracks_album FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE
+    INDEX idx_track_title_reading (title_reading),
+    INDEX idx_track_manual_genre (manual_genre),
+    CONSTRAINT fk_tracks_album FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE,
+    CONSTRAINT fk_tracks_artist FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Play Queue Table

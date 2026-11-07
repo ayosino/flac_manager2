@@ -212,15 +212,16 @@ app.get('/api/artists', async (req, res) => {
   }
 });
 
-// API: List albums for an artist
+// API: List albums for an artist (including compilation appearances)
 app.get('/api/artists/:id/albums', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT id, title, year, cover_url, folder_path 
-      FROM albums 
-      WHERE artist_id = ? 
-      ORDER BY year DESC, title
-    `, [req.params.id]);
+      SELECT DISTINCT a.id, a.title, a.year, a.cover_url, a.folder_path, a.mtime
+      FROM albums a
+      LEFT JOIN tracks t ON t.album_id = a.id
+      WHERE a.artist_id = ? OR t.artist_id = ?
+      ORDER BY a.year DESC, a.title
+    `, [req.params.id, req.params.id]);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -231,13 +232,13 @@ app.get('/api/artists/:id/albums', async (req, res) => {
 app.get('/api/artists/:id/tracks', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT t.id, t.title, t.duration, art.name as artist_name 
+      SELECT t.id, t.title, t.disc_number, t.track_number, t.duration, COALESCE(t.track_artist, art.name) as artist_name 
       FROM tracks t
       JOIN albums a ON t.album_id = a.id
       JOIN artists art ON a.artist_id = art.id
-      WHERE art.id = ?
-      ORDER BY a.year DESC, a.title, t.track_number, t.title
-    `, [req.params.id]);
+      WHERE a.artist_id = ? OR t.artist_id = ?
+      ORDER BY a.year DESC, a.title, t.disc_number, t.track_number, t.title
+    `, [req.params.id, req.params.id]);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -319,13 +320,13 @@ app.get('/api/folders/tracks', async (req, res) => {
     if (!folderPath) return res.status(400).json({ error: 'Path is required' });
 
     const [rows] = await pool.query(`
-      SELECT t.id, t.title, t.duration, art.name as artist_name 
+      SELECT t.id, t.title, t.disc_number, t.track_number, t.duration, COALESCE(t.track_artist, art.name) as artist_name 
       FROM tracks t
       JOIN albums a ON t.album_id = a.id
       JOIN artists art ON a.artist_id = art.id
       WHERE a.folder_path LIKE ?
       ${getExcludeClause('a')}
-      ORDER BY a.folder_path, a.title, t.track_number, t.title
+      ORDER BY a.folder_path, a.title, t.disc_number, t.track_number, t.title
     `, [`${folderPath}%`, ...getExcludeParams()]);
 
     res.json(rows);
@@ -338,10 +339,12 @@ app.get('/api/folders/tracks', async (req, res) => {
 app.get('/api/albums/:id/tracks', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT id, title, track_number, duration 
-      FROM tracks 
-      WHERE album_id = ? 
-      ORDER BY track_number, title
+      SELECT t.id, t.title, t.disc_number, t.track_number, t.duration, COALESCE(t.track_artist, art.name) as artist_name
+      FROM tracks t
+      JOIN albums a ON t.album_id = a.id
+      LEFT JOIN artists art ON a.artist_id = art.id
+      WHERE t.album_id = ? 
+      ORDER BY t.disc_number, t.track_number, t.title
     `, [req.params.id]);
     res.json(rows);
   } catch (err) {
@@ -355,7 +358,7 @@ app.get('/api/albums/:id/tracks', async (req, res) => {
 app.get('/api/queue', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT q.id as queue_id, t.id, t.title, t.duration, art.name as artist_name
+      SELECT q.id as queue_id, t.id, t.title, t.duration, COALESCE(t.track_artist, art.name) as artist_name
       FROM play_queue q
       JOIN tracks t ON q.track_id = t.id
       JOIN albums a ON t.album_id = a.id
@@ -469,7 +472,7 @@ app.get('/api/history', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const [rows] = await pool.query(`
-      SELECT h.id, h.played_at, t.title, t.duration, art.name as artist_name, a.title as album_title
+      SELECT h.id, h.played_at, t.id as track_id, t.title, t.duration, COALESCE(t.track_artist, art.name) as artist_name, a.title as album_title
       FROM playback_history h
       JOIN tracks t ON h.track_id = t.id
       JOIN albums a ON t.album_id = a.id
@@ -517,7 +520,7 @@ app.post('/api/playlists', async (req, res) => {
 app.get('/api/playlists/:id/tracks', async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT pt.id as playlist_track_id, t.id, t.title, t.duration, art.name as artist_name
+      SELECT pt.id as playlist_track_id, t.id, t.title, t.duration, COALESCE(t.track_artist, art.name) as artist_name
       FROM playlist_tracks pt
       JOIN tracks t ON pt.track_id = t.id
       JOIN albums a ON t.album_id = a.id

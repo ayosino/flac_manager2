@@ -912,6 +912,7 @@
             else if (fv === 'folder-detail') bb.onclick = () => browseFolder(fparam);
             const r = await fetch(`/api/albums/${aid}/tracks`);
             const ts = await r.json();
+            const isMultiDisc = ts.some(t => (t.disc_number || 1) > 1);
             document.getElementById('track-content').innerHTML = `
                 <div class="view-header"><h2>${esc(title)}</h2><p>${esc(art)} ${year?'• '+year:''}</p>
                     <div class="btn-group">
@@ -920,11 +921,17 @@
                     </div>
                 </div>
                 <div class="track-list">
-                    ${ts.map(t => `<div class="track-item ${currentTrackId===t.id?'active':''}" id="track-${t.id}" oncontextmenu="showContextMenu(event, 'track', {id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(art)}'})">
-                        <span class="track-no">${t.track_number || '-'}</span>                        <span class="track-title" onclick="playTrack(${t.id}, '${jsesc(t.title)}', '${jsesc(art)}')">${esc(t.title)}</span>
-                        <button class="icon-btn" onclick="addToQueue({id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(art)}'})">+</button>
+                    ${ts.map(t => {
+                        const tArt = t.artist_name || art;
+                        const showTrackArtist = tArt && tArt !== art;
+                        const dispNo = isMultiDisc ? `${t.disc_number || 1}-${t.track_number || '-'}` : (t.track_number || '-');
+                        return `<div class="track-item ${currentTrackId===t.id?'active':''}" id="track-${t.id}" oncontextmenu="showContextMenu(event, 'track', {id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(tArt)}'})">
+                        <span class="track-no">${dispNo}</span>
+                        <span class="track-title" onclick="playTrack(${t.id}, '${jsesc(t.title)}', '${jsesc(tArt)}')">${esc(t.title)}${showTrackArtist ? ` <small style="color:var(--secondary-text)"> - ${esc(tArt)}</small>` : ''}</span>
+                        <button class="icon-btn" onclick="addToQueue({id:${t.id}, title:'${jsesc(t.title)}', artist:'${jsesc(tArt)}'})">+</button>
                         <span class="track-duration">${formatTime(t.duration)}</span>
-                    </div>`).join('')}
+                    </div>`;
+                    }).join('')}
                 </div>`;
             window.scrollTo(0,0);
         }

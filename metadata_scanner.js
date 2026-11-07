@@ -54,6 +54,18 @@ async function scan() {
 
   console.log('Starting scan...');
 
+  async function getOrCreateArtist(name, reading) {
+    const [artists] = await connection.query('SELECT id FROM artists WHERE name = ?', [name]);
+    if (artists.length === 0) {
+      const [result] = await connection.query('INSERT INTO artists (name, name_reading) VALUES (?, ?)', [name, reading]);
+      return result.insertId;
+    } else {
+      const artistId = artists[0].id;
+      await connection.query('UPDATE artists SET name_reading = ? WHERE id = ?', [reading, artistId]);
+      return artistId;
+    }
+  }
+
   async function walk(dir) {
     if (EXCLUDE_DIRS.some(exclude => dir.startsWith(exclude))) {
       console.log(`Skipping excluded directory: ${dir}`);
@@ -85,11 +97,27 @@ async function scan() {
       const metadata = await mm.parseFile(filePath);
       const { common, format } = metadata;
 
-      const artistName = common.artist || 'Unknown Artist';
-      let albumArtistName = common.albumartist || artistName;
-      const albumTitle = common.album || 'Unknown Album';
-      const trackTitle = common.title || path.basename(filePath, '.flac');
+      const dir = path.dirname(filePath);
+      const relParts = MUSIC_DIR && dir.startsWith(MUSIC_DIR)
+        ? dir.slice(MUSIC_DIR.length).split('/').filter(Boolean)
+        : dir.split('/').filter(Boolean).slice(2);
+      const manualGenre = relParts[0] || null;
+      const folderArtist = relParts[1] || null;
+      const folderAlbum = relParts[relParts.length - 1] || null;
+
+      let rawArtist = (common.artist && common.artist.trim()) ? common.artist.trim() : null;
+      let albumArtistName = (common.albumartist && common.albumartist.trim())
+        ? common.albumartist.trim()
+        : (folderArtist === 'Various Artists' ? 'Various Artists' : (rawArtist || folderArtist || 'Unknown Artist'));
+
+      const albumTitle = (common.album && common.album.trim())
+        ? common.album.trim()
+        : (folderAlbum || 'Unknown Album');
+      const trackTitle = (common.title && common.title.trim())
+        ? common.title.trim()
+        : path.basename(filePath, path.extname(filePath));
       const trackNumber = common.track.no || null;
+      const discNumber = common.disk.no || 1;
       const year = common.year || null;
       const duration = Math.round(format.duration || 0);
 
@@ -98,29 +126,33 @@ async function scan() {
         albumArtistName = 'Various Artists';
       }
 
+      // Resolve Track Artist (especially for Various Artists compilations)
+      let trackArtistName = rawArtist || albumArtistName;
+      if (trackArtistName === 'Various Artists') {
+        const titleMatch = trackTitle.match(/^(.+?)\s+-\s+(.+)$/);
+        if (titleMatch) {
+          trackArtistName = titleMatch[1].trim();
+        }
+      }
+
       const albumArtistReading = getReading(albumArtistName);
+      const trackArtistReading = getReading(trackArtistName);
       const albumReading = getReading(albumTitle);
       const trackReading = getReading(trackTitle);
 
-      // 1. Get or Create Artist (using albumArtistName to represent the album's artist)
-      let [artists] = await connection.query('SELECT id FROM artists WHERE name = ?', [albumArtistName]);
-      let artistId;
-      if (artists.length === 0) {
-        const [result] = await connection.query('INSERT INTO artists (name, name_reading) VALUES (?, ?)', [albumArtistName, albumArtistReading]);
-        artistId = result.insertId;
-      } else {
-        artistId = artists[0].id;
-        await connection.query('UPDATE artists SET name_reading = ? WHERE id = ?', [albumArtistReading, artistId]);
-      }
+      // 1. Get or Create Album Artist & Track Artist
+      const albumArtistId = await getOrCreateArtist(albumArtistName, albumArtistReading);
+      const trackArtistId = trackArtistName === albumArtistName
+        ? albumArtistId
+        : await getOrCreateArtist(trackArtistName, trackArtistReading);
 
-      // 2. Get or Create Album
-      let [albums] = await connection.query('SELECT id FROM albums WHERE artist_id = ? AND title = ?', [artistId, albumTitle]);
+      // 2. Get or Create Album (keyed by physical folder_path to prevent cross-folder collisions)
+      let [albums] = await connection.query('SELECT id FROM albums WHERE folder_path = ?', [dir]);
       let albumId;
       if (albums.length === 0) {
-        const dir = path.dirname(filePath);
         const [result] = await connection.query(
-          'INSERT INTO albums (artist_id, title, year, folder_path, mtime, title_reading, added_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-          [artistId, albumTitle, year, dir, mtime, albumReading]
+          'INSERT INTO albums (artist_id, title, year, folder_path, mtime, title_reading, manual_genre, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+          [albumArtistId, albumTitle, year, dir, mtime, albumReading, manualGenre]
         );
         albumId = result.insertId;
         
@@ -132,7 +164,6 @@ async function scan() {
           coverData = common.picture[0].data;
           coverExt = common.picture[0].format.split('/')[1] || 'jpg';
         } else {
-          const dir = path.dirname(filePath);
           const possibleCovers = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png', 'front.jpg', 'front.png'];
           for (const name of possibleCovers) {
             const fullPath = path.join(dir, name);
@@ -152,21 +183,26 @@ async function scan() {
         }
       } else {
         albumId = albums[0].id;
-        // Update mtime and reading
-        await connection.query('UPDATE albums SET mtime = ?, title_reading = ? WHERE id = ?', [mtime, albumReading, albumId]);
+        await connection.query(
+          'UPDATE albums SET mtime = ?, title_reading = ?, manual_genre = COALESCE(manual_genre, ?) WHERE id = ?',
+          [mtime, albumReading, manualGenre, albumId]
+        );
       }
 
       // 3. Insert or Update Track
       const [tracks] = await connection.query('SELECT id FROM tracks WHERE file_path = ?', [filePath]);
       if (tracks.length === 0) {
         await connection.query(
-          'INSERT INTO tracks (album_id, title, track_number, duration, file_path, mtime, title_reading, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
-          [albumId, trackTitle, trackNumber, duration, filePath, mtime, trackReading]
+          `INSERT INTO tracks (album_id, artist_id, track_artist, track_artist_reading, title, track_number, disc_number, duration, file_path, mtime, title_reading, manual_genre, added_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [albumId, trackArtistId, trackArtistName, trackArtistReading, trackTitle, trackNumber, discNumber, duration, filePath, mtime, trackReading, manualGenre]
         );
       } else {
         await connection.query(
-          'UPDATE tracks SET title = ?, track_number = ?, mtime = ?, title_reading = ? WHERE id = ?',
-          [trackTitle, trackNumber, mtime, trackReading, tracks[0].id]
+          `UPDATE tracks
+           SET album_id = ?, artist_id = ?, track_artist = ?, track_artist_reading = ?, title = ?, track_number = ?, disc_number = ?, mtime = ?, title_reading = ?, manual_genre = COALESCE(manual_genre, ?)
+           WHERE id = ?`,
+          [albumId, trackArtistId, trackArtistName, trackArtistReading, trackTitle, trackNumber, discNumber, mtime, trackReading, manualGenre, tracks[0].id]
         );
       }
     } catch (err) {

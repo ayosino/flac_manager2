@@ -18,6 +18,7 @@ SELECT
     al.year AS release_year,
     al.cover_url,
     al.folder_path,
+    al.manual_genre,
     al.mtime,
     al.title_reading,
     al.added_at AS time
@@ -28,12 +29,13 @@ CREATE OR REPLACE VIEW v_grafana_tracks AS
 SELECT 
     t.id AS track_id,
     t.album_id,
-    al.artist_id,
-    ar.name AS artist_name,
+    COALESCE(t.artist_id, al.artist_id) AS artist_id,
+    COALESCE(t.track_artist, ar.name) AS artist_name,
+    ar.name AS album_artist_name,
     al.title AS album_title,
     t.title AS track_title,
-    t.track_number,
     t.disc_number,
+    t.track_number,
     t.duration AS duration_seconds,
     t.file_path,
     t.bpm,
@@ -41,6 +43,7 @@ SELECT
     t.genre,
     t.mood,
     t.country,
+    t.manual_genre,
     t.mtime,
     t.title_reading,
     t.added_at AS time
@@ -54,7 +57,7 @@ SELECT
     ph.played_at AS time,
     ph.track_id,
     t.title AS track_title,
-    ar.name AS artist_name,
+    COALESCE(t.track_artist, ar.name) AS artist_name,
     al.title AS album_title,
     t.duration AS duration_seconds
 FROM playback_history ph
@@ -76,7 +79,7 @@ SELECT
     p.name AS playlist_name,
     pt.track_id,
     t.title AS track_title,
-    ar.name AS artist_name,
+    COALESCE(t.track_artist, ar.name) AS artist_name,
     pt.sort_order
 FROM playlist_tracks pt
 LEFT JOIN playlists p ON pt.playlist_id = p.id
@@ -89,7 +92,7 @@ SELECT
     pq.id AS queue_id,
     pq.track_id,
     t.title AS track_title,
-    ar.name AS artist_name,
+    COALESCE(t.track_artist, ar.name) AS artist_name,
     al.title AS album_title,
     t.duration AS duration_seconds,
     pq.sort_order
