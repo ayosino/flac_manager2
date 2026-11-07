@@ -303,11 +303,10 @@ async function migrate() {
 
     for (const albumId of multiDiscAlbumIds) {
       const [tracks] = await conn.query(
-        'SELECT id, title, track_number, file_path FROM tracks WHERE album_id = ? ORDER BY file_path ASC',
+        'SELECT id, title, track_number, mtime, file_path FROM tracks WHERE album_id = ? ORDER BY track_number ASC, mtime ASC, id ASC',
         [albumId]
       );
-      let inferredDisc = 1;
-      let prevTrackNo = 0;
+      const counts = new Map();
       for (const t of tracks) {
         let tagDisc = null;
         try {
@@ -318,21 +317,11 @@ async function migrate() {
         } catch (e) {
           // ignore read error
         }
-        if (!tagDisc) {
-          // Check filename pattern e.g. 1-01, 2-01, Disc 2
-          const base = path.basename(t.file_path);
-          const m = base.match(/^(\d+)[-_]\d+/);
-          if (m) {
-            tagDisc = parseInt(m[1], 10);
-          } else if (t.track_number !== null && t.track_number <= prevTrackNo) {
-            inferredDisc++;
-            tagDisc = inferredDisc;
-          } else {
-            tagDisc = inferredDisc;
-          }
-        }
-        if (t.track_number !== null) prevTrackNo = t.track_number;
-        await conn.query('UPDATE tracks SET disc_number = ? WHERE id = ?', [tagDisc || 1, t.id]);
+        const tn = t.track_number || 0;
+        const nextDiscForTrackNo = (counts.get(tn) || 0) + 1;
+        counts.set(tn, nextDiscForTrackNo);
+        const finalDisc = (tagDisc && tagDisc > 1) ? tagDisc : nextDiscForTrackNo;
+        await conn.query('UPDATE tracks SET disc_number = ? WHERE id = ?', [finalDisc, t.id]);
       }
     }
 
